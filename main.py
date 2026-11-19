@@ -1,3 +1,7 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 import random
 import string
 from datetime import datetime, timedelta
@@ -8,9 +12,12 @@ import smtplib
 from email.mime.text import MIMEText
 
 
+load_dotenv(Path(__file__).resolve().with_name(".env"))
+
+
 def send_email(message, recipient):
-    sender = "contact@example.com"
-    password = "REDACTED"
+    sender = os.environ["SMTP_USERNAME"]
+    password = os.environ["SMTP_PASSWORD"]
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
     server.starttls()
@@ -28,19 +35,20 @@ def send_email(message, recipient):
         return f"{_ex}\nCheck your login or password please!"
 
 
-bot = telebot.TeleBot('REDACTED')
+bot = telebot.TeleBot(os.environ["TELEGRAM_BOT_TOKEN"])
+payment_source_user_id = int(os.environ["PAYMENT_SOURCE_USER_ID"])
 
 
 def admin_request_post(data):
     credentials = {
-        'app_password': 'REDACTED',
-        'chat_id': '7777777'
+        "app_password": os.environ["SUBSCRIPTION_API_PASSWORD"],
+        "chat_id": os.environ["SUBSCRIPTION_API_ADMIN_ID"]
     }
-    response = requests.post(url='https://megaparsing.pythonanywhere.com/users/', params=credentials, json=data)
+    response = requests.post(url=os.environ["SUBSCRIPTION_API_URL"], params=credentials, json=data)
     return response.status_code
 
 
-@bot.message_handler(func=lambda message: True)
+@bot.message_handler(func=lambda message: message.from_user is not None and message.from_user.id == payment_source_user_id)
 def handle_message(message):
     try:
         data = json.loads(message.text)
@@ -74,7 +82,7 @@ def handle_message(message):
 
         # Проверка статус-кода
         if status_code == 201:
-            print("Все заебись и работало как работает.")
+            print("Подписка успешно оформлена.")
             email_message = f"Здравствуйте!\n Вы успешно купили подписку Мегамаркет Парсинг.\n Ваш логин: " \
                             f"{data.get('Login')}\n Ваш пароль:  {data.get('Password')} \n Скачать программу: https://shorturl.at/iBCDN \n Спасибо за покупку!"
             send_email(email_message, email_pon)
